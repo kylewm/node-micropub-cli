@@ -1,0 +1,10 @@
+{
+  "name": "node-micropub",
+  "version": "0.0.0",
+  "description": "Command-line Micropub Client",
+  "dependencies": {
+    "minimist": "~1.1.0",
+    "request": "~2.45.0",
+    "cheerio": "~0.17.0"
+  }
+}
