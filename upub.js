@@ -5,6 +5,7 @@ var argv = require('minimist')(process.argv.slice(2));
 var http = require('http');
 var request = require('request');
 var cheerio = require('cheerio');
+var fs = require('fs');
 
 function collectEndpoints(userUrl, cb) {
     request(userUrl, function (error, response, html) {
@@ -82,19 +83,42 @@ function exchangeToken(tokenEndpoint, me, authCode, redirectUri, cb) {
             }
         }
     });
-
 }
 
+function getEndpointAndAccessToken(userUrl, cb) {
+    var homeDir =  process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE;
+    var settingsFile = homeDir + '/.node-micropub.json';
 
-var userUrl = argv.url || argv.u;
+    fs.readFile(settingsFile, function (settingsErr, settingsData) {
+        if (!settingsErr) {
+            var settingsBlob = JSON.parse(settingsData);
+            var userBlob = settingsBlob[userUrl];
+            if (userBlob) {
+                cb(userBlob.micropub, userBlob.token);
+                return;
+            }
+        }
 
-collectEndpoints(userUrl, function (authEndpoint, tokenEndpoint, micropubEndpoint) {
-    console.log("attempting to authorize with " + authEndpoint);
-    authorize(userUrl, authEndpoint, function (me, authCode, redirectUri) {
-        exchangeToken(tokenEndpoint, me, authCode, redirectUri, function (token) {
-
-            console.log('access token: ' + token);
-
+        collectEndpoints(userUrl, function (authEndpoint, tokenEndpoint, micropubEndpoint) {
+            console.log("attempting to authorize with " + authEndpoint);
+            authorize(userUrl, authEndpoint, function (me, authCode, redirectUri) {
+                exchangeToken(tokenEndpoint, me, authCode, redirectUri, function (token) {
+                    console.log('access token: ' + token);
+                    userBlob = {
+                        micropub: micropubEndpoint,
+                        token: token,
+                    };
+                    settingsBlob = settingsBlob || {};
+                    settingsBlob[userUrl] = userBlob;
+                    fs.writeFile(settingsFile, JSON.stringify(settingsBlob, null, 2));
+                    cb(micropubEndpoint, token);
+                });
+            });
         });
     });
+}
+
+var userUrl = argv.url || argv.u;
+getEndpointAndAccessToken(userUrl, function (micropubEndpoint, token) {
+    console.log('got endpoint ' + micropubEndpoint + ', and token ' + token);
 });
